@@ -1,0 +1,35 @@
+{
+  "name": "daily-journal",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22.12.0" },
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "typecheck": "vue-tsc --noEmit",
+    "build": "vue-tsc --noEmit && vite build",
+    "test": "vitest run",
+    "android:sync": "npm run build && cap sync android",
+    "android:open": "cap open android"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.5.3",
+    "@capacitor/app": "8.1.2",
+    "@capacitor/core": "8.5.3",
+    "@capacitor-community/sqlite": "8.1.1",
+    "pinia": "3.0.4",
+    "sortablejs": "1.15.7",
+    "vant": "4.10.2",
+    "vue": "3.5.44",
+    "vue-router": "4.6.4"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.3",
+    "@types/sortablejs": "1.15.9",
+    "@vitejs/plugin-vue": "6.0.10",
+    "typescript": "5.9.3",
+    "vite": "7.3.1",
+    "vitest": "4.0.18",
+    "vue-tsc": "3.3.13"
+  }
+}

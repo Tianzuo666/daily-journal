@@ -12,6 +12,7 @@
     "build": "vue-tsc --noEmit && vite build",
     "test": "vitest run",
     "android:sync": "npm run build && cap sync android",
+    "android:build": "node scripts/build-android.mjs",
     "android:open": "cap open android"
   },
   "dependencies": {

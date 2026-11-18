@@ -71,7 +71,7 @@ docs/phase2-requirements.md    二期需求草案、已确认决定与验收标�
 
 版本使用 `主.次.修订` 三段非负整数，无前导零，次版本和修订号各不超过999，生成的整数必须为1～2100000000；格式无效时停止安卓构建，不静默回退旧版本。当前不支持 `beta` 等预发布后缀。每次发布应提高版本，沿用同一签名。[Android 版本说明](https://developer.android.com/studio/publish/versioning)
 
-修改版本后，仍先运行 `npm run android:sync`，再运行 Gradle 打包，确保设置页里的前端资源和安装包版本一起更新。直接运行 Gradle 会读取新版本，但不能代替前端资源构建与同步。`package-lock.json` 由 npm 维护，不作为应用运行版本来源。
+修改版本后，在项目根目录运行 `npm run android:build`，按下文的一键流程同步前端并生成 APK，确保设置页和安装包版本一起更新。直接运行 Gradle 会读取新版本，但不能代替前端资源构建与同步。`package-lock.json` 由 npm 维护，不作为应用运行版本来源。
 
 此统一版本实现已写入源码，尚未运行类型检查、前端构建或安卓构建。
 
@@ -117,7 +117,20 @@ npm run typecheck
 npm test
 ```
 
-前端构建与安卓资源同步，再生成可安装 Debug APK：
+一键构建前端、同步安卓资源并生成 Debug APK，在项目根目录执行：
+
+```powershell
+Set-Location 'D:\workSpace\daily-journal'
+npm run android:build
+```
+
+该命令依次执行 `android:sync`（包含前端类型检查、构建及 Capacitor 同步）和 `gradlew.bat --no-daemon :app:assembleDebug`。前一步失败就停止；不执行 `npm install`/`npm ci`、单元测试、自动修改版本或安装到手机。Gradle 缺少缓存时仍可能下载构建工具和安卓依赖。脚本已写入，尚未执行验证。
+
+原签名固定为 `%USERPROFILE%\Documents\Codex\2026-10-21\wo-x\work\android-user\debug.keystore`，同时设置本次进程的 `ANDROID_USER_HOME` 和传给 Gradle 的专用密钥路径；不会因当前终端的默认签名目录不同而换钥。文件不存在时在前端构建前停止，不自动生成或复制另一份。该命令继续构建 Debug 包；不能据此推定手机现有 APK 的证书已核对。
+
+JDK 优先使用已有 `JAVA_HOME`，未设置时使用 `D:\appBox\Java\jdk-21`；SDK 优先使用 `ANDROID_HOME`/`ANDROID_SDK_ROOT`，未设置时使用 `D:\appBox\Android\Sdk`。Gradle 缓存沿用已有 `GRADLE_USER_HOME`，未设置时使用原工作目录的 `gradle-home`。这些设置只影响本次构建子进程，不修改系统环境变量。签名文件路径定义在 `scripts/build-android.mjs`，移动工具目录时须保留并安全迁移原密钥。
+
+需要分步排查时，也可沿用前面的临时环境设置，然后执行：
 
 ```powershell
 Set-Location 'D:\workSpace\daily-journal'
@@ -140,6 +153,10 @@ npm run android:open
 Android Studio 的 Gradle JDK 也需选 JDK 21，SDK 位置需指向同一 SDK。**不要再次执行 `cap add android` 覆盖现有工程**，其中包含自定义文件插件。使用自己的 SDK 时可通过 `ANDROID_HOME` 或 `android/local.properties` 指定位置；该文件忽略提交。
 
 当前为 Debug 签名安装验证方案。正式 Release 包还需另行配置固定发布密钥和签名，`assembleRelease` 本身不保证生成可直接安装的已签名包。通过编码代理运行安装、检查或构建时，仍按项目约定先取得授权。
+
+## VS Code 的 Vue 3 提示
+
+本项目使用 Vue 3 和 TypeScript 的 `moduleResolution: Bundler`。VS Code 使用 Vue - Official（扩展标识 `Vue.volar`）；若安装了 Vetur（`octref.vetur`），在此工作区禁用 Vetur，再重载窗口。无需为了 Vetur 的模块找不到提示把解析方式改为 `node`。扩展的安装和启停由用户操作，本轮未修改全局编辑器设置。[Vue 官方建议](https://vuejs.org/guide/scaling-up/tooling.html#ide-support)
 
 ## 版本核对来源
 

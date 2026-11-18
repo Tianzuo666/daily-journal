@@ -16,6 +16,12 @@ if (journalVersionNumber < 1 || journalVersionNumber > 2100000000) {
 }
 def journalVersionCode = journalVersionNumber.intValue()
 
+// 一键脚本显式指定原调试密钥，避免不同终端默认目录导致签名变化。
+def journalDebugKeystorePath = providers.environmentVariable('DAILY_JOURNAL_DEBUG_KEYSTORE').orNull
+if (journalDebugKeystorePath && !file(journalDebugKeystorePath).isFile()) {
+    throw new GradleException('指定的原调试密钥不存在，停止打包：' + journalDebugKeystorePath)
+}
+
 android {
     namespace = 'app.local.dailyjournal'
     compileSdk = rootProject.ext.compileSdkVersion
@@ -26,6 +32,11 @@ android {
         versionCode journalVersionCode
         versionName journalVersionName
         aaptOptions { ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~' }
+    }
+    signingConfigs {
+        debug {
+            if (journalDebugKeystorePath) storeFile file(journalDebugKeystorePath)
+        }
     }
     buildTypes { release { minifyEnabled false } }
 }

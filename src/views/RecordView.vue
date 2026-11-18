@@ -4,12 +4,16 @@ import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import { App as CapacitorApp } from '@capacitor/app'
 import { showConfirmDialog } from 'vant'
 import { useJournal, clone, errorMessage } from '../stores/journal'
-import { id, localDate } from '../domain'
+import { id, localDate, validDate } from '../domain'
 import { files, imageUrl, native } from '../native'
 
 const route = useRoute(), router = useRouter(), store = useJournal()
-const existing = store.data.notes.find(n => n.id === route.params.id)
+const existing = store.data.notes.find(n => n.id === route.params.id && !n.deletedAt)
 const draft = ref(existing ? clone(existing) : store.newNote()), missing = route.params.id !== 'new' && !existing
+if (!existing && typeof route.query.date === 'string' && validDate(route.query.date)) draft.value.recordDate = route.query.date
+const tagName = ref('')
+async function addTag() { try { const tagId = await store.saveTag(tagName.value); draft.value.tagIds = [...new Set([...(draft.value.tagIds ?? []), tagId])]; tagName.value = '' } catch (reason) { store.notify(errorMessage(reason)) } }
+function toggleTag(tagId: string) { draft.value.tagIds = draft.value.tagIds?.includes(tagId) ? draft.value.tagIds.filter(t => t !== tagId) : [...(draft.value.tagIds ?? []), tagId] }
 const saveError = ref(''), dirty = ref(false), saving = ref(false), picking = ref(false), leaving = ref(false), photo = ref('')
 const persisted = computed(() => store.data.notes.some(n => n.id === draft.value.id))
 let timer: ReturnType<typeof setTimeout> | undefined, saveQueue: Promise<void> = Promise.resolve(), deleting = false
@@ -41,7 +45,7 @@ async function pickImages() {
   catch (error) { store.notify(errorMessage(error)) } finally { picking.value = false }
 }
 async function removeNote() {
-  try { await showConfirmDialog({ title: '删除这篇记录？', message: '文字、图片和待办会一起移除。', confirmButtonText: '删除', cancelButtonText: '保留' }) } catch { return }
+  try { await showConfirmDialog({ title: '移入回收站？', message: '文字、图片和待办将保留30天，可在设置中恢复。', confirmButtonText: '移入', cancelButtonText: '保留' }) } catch { return }
   deleting = true; clearTimeout(timer)
   try { await saveQueue.catch(() => undefined); await store.deleteNote(draft.value.id); await router.replace('/notes') }
   catch (error) { deleting = false; store.notify(errorMessage(error)) }
@@ -61,6 +65,8 @@ onUnmounted(() => { clearTimeout(timer); window.removeEventListener('journal-bac
     <header class="page-header editor-header"><button class="icon-button" aria-label="保存并返回" :disabled="picking || leaving" @click="done">‹</button><span class="muted">{{ saving ? '正在保存…' : saveError ? '保存失败' : dirty ? '待保存' : '已保存' }}</span><button class="primary" :disabled="picking || leaving" @click="done">完成</button></header>
     <fieldset :disabled="picking || leaving" style="border:0;margin:0;padding:0;min-width:0">
     <p class="muted">{{ localDate(new Date(draft.createdAt)) }} · {{ draft.pinned ? '已置顶' : '记录' }}</p>
+    <label>记录日期<input v-model="draft.recordDate" type="date" min="1900-01-01"></label>
+    <div class="toolbar"><button v-for="tag in store.data.tags" :key="tag.id" class="chip" :class="{ selected: draft.tagIds?.includes(tag.id) }" :aria-pressed="draft.tagIds?.includes(tag.id)" @click="toggleTag(tag.id)">{{ draft.tagIds?.includes(tag.id) ? '✓ ' : '' }}{{ tag.name }}</button></div><div class="row"><input v-model="tagName" maxlength="20" placeholder="添加标签（1～20字）" aria-label="新标签"><button class="secondary" :disabled="!tagName.trim()" @click="addTag">添加</button></div>
     <label><span class="muted">标题</span><input v-model="draft.title" class="editor-title" placeholder="给这篇记录起个名字" maxlength="200"></label>
     <label><span class="muted">正文</span><textarea v-model="draft.body" class="editor-body" placeholder="写下此刻想记住的事…" maxlength="1000000"></textarea></label>
     <div class="stack" style="gap:10px"><div v-for="(todo, index) in draft.todos" :key="todo.id" class="check-row"><input v-model="todo.done" type="checkbox" :aria-label="`完成待办：${todo.text}`"><input v-model="todo.text" type="text" :class="{ done: todo.done }" maxlength="1000" placeholder="待办内容" aria-label="待办内容"><button aria-label="删除待办" @click="draft.todos.splice(index, 1)">×</button></div></div>

@@ -12,10 +12,18 @@ interface JournalFilesPlugin {
   chooseBackup(): Promise<StagedBackup & { cancelled?: boolean }>
   installImages(options: { token: string }): Promise<void>
   removeImages(options: { images: string[] }): Promise<void>
+  deleteBackup(options: { path: string }): Promise<void>
   discardStage(options: { token: string }): Promise<void>
   createTextExport(options: { name: string; content: string }): Promise<{ path: string }>
   createNotesExport(options: { notes: string }): Promise<{ path: string }>
 }
 export const native = Capacitor.getPlatform() === 'android'
 export const files = registerPlugin<JournalFilesPlugin>('JournalFiles')
+export interface LockStatus { enabled: boolean; locked: boolean; secure: boolean; retryAfter: number }
+export const lock = registerPlugin<{
+  status(): Promise<LockStatus>
+  unlock(options: { pin: string }): Promise<LockStatus>
+  configure(options: { pin: string; currentPin: string; disable: boolean }): Promise<LockStatus>
+  reset(options: { pin: string }): Promise<LockStatus>
+}>('JournalLock')
 export const imageUrl = (directory: string, file: string) => Capacitor.convertFileSrc(`${directory}/${file}`)

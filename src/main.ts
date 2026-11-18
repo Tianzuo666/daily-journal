@@ -8,6 +8,10 @@ import RecordView from './views/RecordView.vue'
 import SettingsView from './views/SettingsView.vue'
 import AppearanceView from './views/AppearanceView.vue'
 import CategoriesView from './views/CategoriesView.vue'
+import PrivacyView from './views/PrivacyView.vue'
+import TagsView from './views/TagsView.vue'
+import TrashView from './views/TrashView.vue'
+import RecurringView from './views/RecurringView.vue'
 import './style.css'
 import 'vant/lib/button/style'
 import 'vant/lib/popup/style'
@@ -23,6 +27,10 @@ const router = createRouter({
     { path: '/settings', component: SettingsView },
     { path: '/appearance', component: AppearanceView },
     { path: '/categories', component: CategoriesView },
+    { path: '/privacy', component: PrivacyView },
+    { path: '/tags', component: TagsView },
+    { path: '/trash', component: TrashView },
+    { path: '/recurring', component: RecurringView },
     { path: '/:pathMatch(.*)*', redirect: '/ledger' },
   ],
 })

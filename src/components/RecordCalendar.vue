@@ -1,0 +1,15 @@
+<script setup lang="ts">
+import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { localDate, noteDate, money, validDate } from '../domain'
+import { useJournal } from '../stores/journal'
+const store = useJournal(), router = useRouter(), month = ref(store.today.slice(0, 7)), day = ref(store.today)
+// 月份输入清空时显示空网格，不使用无效日期构造数组。
+const dates = computed(() => { if (!validDate(month.value + '-01')) return []; const base = new Date(month.value + '-01T12:00:00'), prefix = (base.getDay() + 6) % 7, count = new Date(base.getFullYear(), base.getMonth() + 1, 0).getDate(); return [...Array(prefix).fill(''), ...Array.from({ length: count }, (_, i) => `${month.value}-${String(i + 1).padStart(2, '0')}`)] as string[] })
+const notes = computed(() => store.data.notes.filter(n => !n.deletedAt && noteDate(n) === day.value)), entries = computed(() => store.data.entries.filter(e => !e.deletedAt && e.date === day.value))
+const sum = (type: 'income' | 'expense') => entries.value.filter(e => e.type === type).reduce((a, e) => a + e.amountCents, 0)
+const hasNote = (date: string) => store.data.notes.some(n => !n.deletedAt && noteDate(n) === date)
+const hasEntry = (date: string) => store.data.entries.some(e => !e.deletedAt && e.date === date)
+function shift(offset: number) { const date = new Date((validDate(month.value + '-01') ? month.value : store.today.slice(0, 7)) + '-01T12:00:00'); date.setMonth(date.getMonth() + offset); month.value = localDate(date).slice(0, 7); day.value = `${month.value}-01` }
+</script>
+<template><section class="stack"><div class="toolbar"><button class="secondary" @click="shift(-1)">上月</button><label>月份<input v-model="month" type="month" min="1900-01" @change="day = month + '-01'"></label><button class="secondary" @click="shift(1)">下月</button><button class="secondary" @click="month = store.today.slice(0, 7); day = store.today">今天</button></div><div class="calendar-grid"><span v-for="name in ['一','二','三','四','五','六','日']" :key="name" class="muted">{{ name }}</span><button v-for="(date, index) in dates" :key="date || index" :disabled="!date" :class="{ selected: day === date }" @click="day = date"><span>{{ date ? Number(date.slice(8)) : '' }}</span><small>{{ date && hasNote(date) ? '记' : '' }}{{ date && hasEntry(date) ? '账' : '' }}</small></button></div><h2>{{ day }}</h2><p>收入 ¥{{ money(sum('income')) }} · 支出 ¥{{ money(sum('expense')) }}</p><p class="muted">当天全部有效账单，不沿用其他页面筛选。</p><button v-for="entry in entries" :key="entry.id" class="ledger-row" @click="router.push({ path: '/ledger', query: { entry: entry.id } })"><span class="grow">{{ store.data.categories.find(c => c.id === entry.categoryId)?.name }} · {{ entry.remark }}</span><span>{{ entry.type === 'income' ? '+' : '−' }}{{ money(entry.amountCents) }}</span></button><button v-for="note in notes" :key="note.id" class="panel full" @click="router.push(`/notes/${note.id}`)">{{ note.title || '无标题记录' }}</button><p v-if="!notes.length && !entries.length" class="muted">这一天还没有内容</p><button class="primary" :disabled="!validDate(day)" @click="router.push({ path: '/notes/new', query: { date: day } })">写这一天的记录</button></section></template>

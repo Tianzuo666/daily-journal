@@ -82,10 +82,13 @@ public class JournalFilesPlugin extends Plugin {
         return new JSObject().put("path", file.getAbsolutePath()).put("name", file.getName()).put("size", file.length()).put("createdAt", file.lastModified());
     }
     private JSONArray manifestImages(JSONObject manifest) throws Exception {
-        if (!"daily-journal".equals(manifest.getString("format")) || manifest.getInt("version") != 1) throw new IOException("备份格式或版本不支持");
-        JSONArray notes = manifest.getJSONObject("data").getJSONArray("notes"), images = new JSONArray(); Set<String> names = new HashSet<>();
+        int version = manifest.getInt("version");
+        if (!"daily-journal".equals(manifest.getString("format")) || (version != 1 && version != 2)) throw new IOException("备份格式或版本不支持");
+        JSONArray notes = new JSONArray(manifest.getJSONObject("data").getJSONArray("notes").toString()), images = new JSONArray(); Set<String> names = new HashSet<>();
+        if (version == 2) { JSONArray entries = manifest.getJSONObject("data").getJSONArray("entries"); for (int i = 0; i < entries.length(); i++) notes.put(entries.getJSONObject(i)); }
         for (int n = 0; n < notes.length(); n++) {
-            JSONArray attachments = notes.getJSONObject(n).getJSONArray("images");
+            JSONArray attachments = notes.getJSONObject(n).optJSONArray("images");
+            if (attachments == null) attachments = new JSONArray();
             for (int i = 0; i < attachments.length(); i++) {
                 JSONObject attachment = attachments.getJSONObject(i); String file = attachment.getString("file");
                 if (!file.matches(IMAGE_PATTERN) || !names.add(file) || !attachment.getString("sha256").matches("[0-9a-f]{64}") || attachment.getLong("size") <= 0 || attachment.getLong("size") > IMAGE_LIMIT) throw new IOException("备份中的图片清单无效");
@@ -234,6 +237,10 @@ public class JournalFilesPlugin extends Plugin {
     @PluginMethod public void discardStage(PluginCall call) { io(call, () -> { String token = required(call, "token"); if (!token.matches("[0-9a-f-]{36}")) throw new IOException("临时文件编号无效"); removeTree(new File(directory("stages", true), token)); return new JSObject(); }); }
     @PluginMethod public void removeImages(PluginCall call) { io(call, () -> { JSArray names = call.getArray("images", new JSArray()); for (int i = 0; i < names.length(); i++) { File file = image(names.getString(i)); if (file.exists() && !file.delete()) throw new IOException("部分图片未能清理"); } return new JSObject(); }); }
 
+    @PluginMethod public void deleteBackup(PluginCall call) {
+        io(call, () -> { File file = exportSource(required(call, "path")); if (!file.getParentFile().getCanonicalFile().equals(directory("backups", false).getCanonicalFile()) || !file.getName().endsWith(".zip")) throw new IOException("只能删除应用内完整备份"); if (!file.delete()) throw new IOException("备份未能删除"); return new JSObject(); });
+    }
+
     private File exportSource(String path) throws IOException {
         File file = new File(path).getCanonicalFile(); String value = file.getPath();
         if (!value.startsWith(directory("backups", false).getCanonicalPath() + File.separator) && !value.startsWith(directory("exports", true).getCanonicalPath() + File.separator)) throw new IOException("导出文件路径无效");
@@ -278,6 +285,7 @@ public class JournalFilesPlugin extends Plugin {
                     String title = note.getString("title").replace('\n', ' '); if (title.trim().isEmpty()) title = "无标题记录";
                     index.append("- ").append(title).append("：notes/").append(noteId).append(".md\n");
                     StringBuilder text = new StringBuilder("# ").append(title).append("\n\n创建时间：").append(new Date(note.getLong("createdAt"))).append("\n置顶：").append(note.getBoolean("pinned") ? "是" : "否").append("\n排序：").append(note.getLong("position")).append("\n\n").append(note.getString("body")).append("\n\n");
+                    text.append("\n记录日期：").append(note.optString("recordDate", "")).append("\n标签：").append(note.optJSONArray("tagNames")).append("\n\n");
                     JSONArray todos = note.getJSONArray("todos");
                     for (int i = 0; i < todos.length(); i++) { JSONObject todo = todos.getJSONObject(i); text.append(todo.getBoolean("done") ? "- [x] " : "- [ ] ").append(todo.getString("text").replace('\n', ' ')).append('\n'); }
                     JSONArray images = note.getJSONArray("images");

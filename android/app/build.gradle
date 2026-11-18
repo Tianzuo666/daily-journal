@@ -1,5 +1,21 @@
 apply plugin: 'com.android.application'
 
+// package.json 是唯一版本来源，直接运行 Gradle 也能读取当前版本。
+def journalVersionName = new groovy.json.JsonSlurper().parse(rootProject.file('../package.json'), 'UTF-8').version
+if (!(journalVersionName instanceof String) || !(journalVersionName ==~ /(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)/)) {
+    throw new GradleException('package.json.version 必须为数字版本号，例如 0.2.0；暂不支持预发布后缀')
+}
+def journalVersionParts = journalVersionName.tokenize('.').collect { it.toBigInteger() }
+if (journalVersionParts[1] > 999 || journalVersionParts[2] > 999) {
+    throw new GradleException('次版本号和修订号必须为 0～999，才能生成不冲突的安卓版本号')
+}
+// 保证正常递增的主/次/修订版本能得到递增整数，且不会发生字符串拼接碰撞。
+def journalVersionNumber = journalVersionParts[0] * 1000000 + journalVersionParts[1] * 1000 + journalVersionParts[2]
+if (journalVersionNumber < 1 || journalVersionNumber > 2100000000) {
+    throw new GradleException('生成的安卓 versionCode 必须在 1～2100000000 之间，请调整 package.json.version')
+}
+def journalVersionCode = journalVersionNumber.intValue()
+
 android {
     namespace = 'app.local.dailyjournal'
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +23,8 @@ android {
         applicationId 'app.local.dailyjournal'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName '0.1.0'
+        versionCode journalVersionCode
+        versionName journalVersionName
         aaptOptions { ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~' }
     }
     buildTypes { release { minifyEnabled false } }
